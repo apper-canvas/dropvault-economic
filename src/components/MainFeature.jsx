@@ -7,6 +7,10 @@ import ApperIcon from './ApperIcon'
 const MainFeature = () => {
   const [files, setFiles] = useState([])
   const [uploads, setUploads] = useState([])
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showMoveDialog, setShowMoveDialog] = useState(false)
+  const [showCopyDialog, setShowCopyDialog] = useState(false)
+
   const [isDragActive, setIsDragActive] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState(new Set())
   const [viewMode, setViewMode] = useState('grid') // 'grid' or 'list'
@@ -143,11 +147,63 @@ const MainFeature = () => {
 
   const deleteSelectedFiles = () => {
     if (selectedFiles.size === 0) return
-    
-    setFiles(prev => prev.filter(file => !selectedFiles.has(file.id)))
-    setSelectedFiles(new Set())
-    toast.success(`${selectedFiles.size} file(s) deleted successfully!`)
+    setShowDeleteConfirm(true)
   }
+
+  const confirmDelete = () => {
+    setFiles(prev => prev.filter(file => !selectedFiles.has(file.id)))
+    const count = selectedFiles.size
+    setSelectedFiles(new Set())
+    setShowDeleteConfirm(false)
+    toast.success(`${count} file(s) deleted successfully!`)
+  }
+
+  const moveSelectedFiles = (targetFolderId) => {
+    if (selectedFiles.size === 0) return
+    
+    setFiles(prev => prev.map(file => 
+      selectedFiles.has(file.id) 
+        ? { ...file, folderId: targetFolderId }
+        : file
+    ))
+    
+    const count = selectedFiles.size
+    const targetFolder = folders.find(f => f.id === targetFolderId)
+    setSelectedFiles(new Set())
+    setShowMoveDialog(false)
+    toast.success(`${count} file(s) moved to ${targetFolder?.name || 'folder'} successfully!`)
+  }
+
+  const copySelectedFiles = (targetFolderId) => {
+    if (selectedFiles.size === 0) return
+    
+    const filesToCopy = files.filter(file => selectedFiles.has(file.id))
+    const copiedFiles = filesToCopy.map(file => ({
+      ...file,
+      id: Date.now() + Math.random(),
+      name: `Copy of ${file.name}`,
+      folderId: targetFolderId,
+      uploadDate: new Date()
+    }))
+    
+    setFiles(prev => [...prev, ...copiedFiles])
+    const count = selectedFiles.size
+    const targetFolder = folders.find(f => f.id === targetFolderId)
+    setSelectedFiles(new Set())
+    setShowCopyDialog(false)
+    toast.success(`${count} file(s) copied to ${targetFolder?.name || 'folder'} successfully!`)
+  }
+
+  const selectAllFiles = () => {
+    const allFileIds = new Set(currentFolderFiles.map(file => file.id))
+    setSelectedFiles(allFileIds)
+  }
+
+  const clearSelection = () => {
+    setSelectedFiles(new Set())
+  }
+
+
 
   const currentFolderFiles = files.filter(file => file.folderId === currentFolder)
   const currentFolderData = folders.find(f => f.id === currentFolder)
@@ -188,16 +244,25 @@ const MainFeature = () => {
           </div>
           
           {selectedFiles.size > 0 && (
-            <motion.button
-              onClick={deleteSelectedFiles}
-              className="flex items-center space-x-2 px-3 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-            >
-              <ApperIcon name="Trash2" className="w-4 h-4" />
-              <span className="hidden sm:inline">Delete ({selectedFiles.size})</span>
-            </motion.button>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm text-surface-600 dark:text-surface-400">
+                {selectedFiles.size} selected
+              </span>
+              <button
+                onClick={selectAllFiles}
+                className="text-sm text-primary-600 hover:text-primary-700 transition-colors"
+              >
+                Select All
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-sm text-surface-600 hover:text-surface-700 transition-colors"
+              >
+                Clear
+              </button>
+            </div>
           )}
+
         </div>
       </div>
 
@@ -413,6 +478,240 @@ const MainFeature = () => {
           ))}
         </motion.div>
       )}
+
+      {/* Batch Action Toolbar */}
+      <AnimatePresence>
+        {selectedFiles.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 100 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 100 }}
+            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50"
+          >
+            <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-2xl border border-surface-200 dark:border-surface-700 p-4">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-surface-900 dark:text-white">
+                  {selectedFiles.size} file(s) selected
+                </span>
+                
+                <div className="flex items-center space-x-2">
+                  <motion.button
+                    onClick={() => setShowMoveDialog(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ApperIcon name="FolderOpen" className="w-4 h-4" />
+                    <span>Move</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={() => setShowCopyDialog(true)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ApperIcon name="Copy" className="w-4 h-4" />
+                    <span>Copy</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={deleteSelectedFiles}
+                    className="flex items-center space-x-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ApperIcon name="Trash2" className="w-4 h-4" />
+                    <span>Delete</span>
+                  </motion.button>
+                  
+                  <motion.button
+                    onClick={clearSelection}
+                    className="p-2 text-surface-500 hover:text-surface-700 transition-colors"
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                  >
+                    <ApperIcon name="X" className="w-4 h-4" />
+                  </motion.button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Dialog */}
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowDeleteConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-surface-800 rounded-2xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-red-100 dark:bg-red-900/20 rounded-full flex items-center justify-center mr-4">
+                  <ApperIcon name="AlertTriangle" className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+                    Delete Files
+                  </h3>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">
+                    This action cannot be undone
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-surface-700 dark:text-surface-300 mb-6">
+                Are you sure you want to delete {selectedFiles.size} selected file(s)?
+              </p>
+              
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 px-4 py-2 border border-surface-300 dark:border-surface-600 text-surface-700 dark:text-surface-300 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  className="flex-1 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+                >
+                  Delete
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Move Dialog */}
+      <AnimatePresence>
+        {showMoveDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowMoveDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-surface-800 rounded-2xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mr-4">
+                  <ApperIcon name="FolderOpen" className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+                    Move Files
+                  </h3>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">
+                    Select destination folder
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-surface-700 dark:text-surface-300 mb-4">
+                Move {selectedFiles.size} selected file(s) to:
+              </p>
+              
+              <div className="space-y-2 mb-6 max-h-40 overflow-y-auto">
+                {folders.filter(f => f.id !== currentFolder).map((folder) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => moveSelectedFiles(folder.id)}
+                    className="w-full flex items-center space-x-3 p-3 text-left hover:bg-surface-50 dark:hover:bg-surface-700 rounded-lg transition-colors"
+                  >
+                    <ApperIcon name="Folder" className="w-5 h-5 text-surface-500" />
+                    <span className="text-surface-900 dark:text-white">{folder.name}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                onClick={() => setShowMoveDialog(false)}
+                className="w-full px-4 py-2 border border-surface-300 dark:border-surface-600 text-surface-700 dark:text-surface-300 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Copy Dialog */}
+      <AnimatePresence>
+        {showCopyDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowCopyDialog(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-surface-800 rounded-2xl p-6 max-w-md w-full"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-4">
+                <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mr-4">
+                  <ApperIcon name="Copy" className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-surface-900 dark:text-white">
+                    Copy Files
+                  </h3>
+                  <p className="text-sm text-surface-600 dark:text-surface-400">
+                    Select destination folder
+                  </p>
+                </div>
+              </div>
+              
+              <p className="text-surface-700 dark:text-surface-300 mb-4">
+                Copy {selectedFiles.size} selected file(s) to:
+              </p>
+              
+              <div className="space-y-2 mb-6 max-h-40 overflow-y-auto">
+                {folders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => copySelectedFiles(folder.id)}
+                    className="w-full flex items-center space-x-3 p-3 text-left hover:bg-surface-50 dark:hover:bg-surface-700 rounded-lg transition-colors"
+                  >
+                    <ApperIcon name="Folder" className="w-5 h-5 text-surface-500" />
+                    <span className="text-surface-900 dark:text-white">{folder.name}</span>
+                  </button>
+                ))}
+              </div>
+              
+              <button
+                onClick={() => setShowCopyDialog(false)}
+                className="w-full px-4 py-2 border border-surface-300 dark:border-surface-600 text-surface-700 dark:text-surface-300 rounded-lg hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+              >
+                Cancel
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     </div>
   )
 }
