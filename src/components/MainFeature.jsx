@@ -10,6 +10,9 @@ const MainFeature = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showMoveDialog, setShowMoveDialog] = useState(false)
   const [showCopyDialog, setShowCopyDialog] = useState(false)
+  const [showVersionHistory, setShowVersionHistory] = useState(false)
+  const [selectedFileForHistory, setSelectedFileForHistory] = useState(null)
+
 
   const [isDragActive, setIsDragActive] = useState(false)
   const [selectedFiles, setSelectedFiles] = useState(new Set())
@@ -76,7 +79,7 @@ const MainFeature = () => {
           if (newProgress >= 100) {
             clearInterval(interval)
             
-            // Add to files list
+            // Add to files list with version history
             const newFile = {
               id: Date.now() + Math.random(),
               name: file.name,
@@ -86,8 +89,21 @@ const MainFeature = () => {
               folderId: currentFolder,
               tags: [],
               url: URL.createObjectURL(file),
-              thumbnail: file.type.startsWith('image/') ? URL.createObjectURL(file) : null
+              thumbnail: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+              versions: [
+                {
+                  id: 1,
+                  versionNumber: 1,
+                  timestamp: new Date(),
+                  size: file.size,
+                  url: URL.createObjectURL(file),
+                  thumbnail: file.type.startsWith('image/') ? URL.createObjectURL(file) : null,
+                  isCurrentVersion: true
+                }
+              ],
+              currentVersion: 1
             }
+
             
             setFiles(prev => [...prev, newFile])
             
@@ -201,6 +217,50 @@ const MainFeature = () => {
 
   const clearSelection = () => {
     setSelectedFiles(new Set())
+
+  const viewFileHistory = (file) => {
+    setSelectedFileForHistory(file)
+    setShowVersionHistory(true)
+  }
+
+  const revertToVersion = (versionId) => {
+    if (!selectedFileForHistory) return
+    
+    const selectedVersion = selectedFileForHistory.versions.find(v => v.id === versionId)
+    if (!selectedVersion) return
+    
+    // Create new version from selected version
+    const newVersionNumber = selectedFileForHistory.currentVersion + 1
+    const newVersion = {
+      id: Date.now() + Math.random(),
+      versionNumber: newVersionNumber,
+      timestamp: new Date(),
+      size: selectedVersion.size,
+      url: selectedVersion.url,
+      thumbnail: selectedVersion.thumbnail,
+      isCurrentVersion: true
+    }
+    
+    setFiles(prev => prev.map(file => {
+      if (file.id === selectedFileForHistory.id) {
+        const updatedVersions = file.versions.map(v => ({ ...v, isCurrentVersion: false }))
+        return {
+          ...file,
+          versions: [...updatedVersions, newVersion],
+          currentVersion: newVersionNumber,
+          url: selectedVersion.url,
+          thumbnail: selectedVersion.thumbnail,
+          size: selectedVersion.size
+        }
+      }
+      return file
+    }))
+    
+    setShowVersionHistory(false)
+    setSelectedFileForHistory(null)
+    toast.success(`Reverted to version ${selectedVersion.versionNumber} successfully!`)
+  }
+
   }
 
 
@@ -465,6 +525,13 @@ const MainFeature = () => {
                 {/* Actions */}
                 {viewMode === 'list' && (
                   <div className="flex items-center space-x-2">
+                    <button 
+                      onClick={() => viewFileHistory(file)}
+                      className="p-2 text-surface-400 hover:text-blue-500 transition-colors"
+                      title="View History"
+                    >
+                      <ApperIcon name="History" className="w-4 h-4" />
+                    </button>
                     <button className="p-2 text-surface-400 hover:text-primary-500 transition-colors">
                       <ApperIcon name="Download" className="w-4 h-4" />
                     </button>
@@ -473,6 +540,18 @@ const MainFeature = () => {
                     </button>
                   </div>
                 )}
+                
+                {/* Grid View History Button */}
+                {viewMode === 'grid' && (
+                  <button 
+                    onClick={() => viewFileHistory(file)}
+                    className="absolute top-2 left-2 p-2 bg-white dark:bg-surface-800 rounded-full shadow-sm opacity-0 group-hover:opacity-100 transition-opacity border border-surface-300 dark:border-surface-600 hover:border-blue-500"
+                    title="View History"
+                  >
+                    <ApperIcon name="History" className="w-4 h-4 text-surface-600 hover:text-blue-500" />
+                  </button>
+                )}
+
               </div>
             </motion.div>
           ))}
@@ -710,6 +789,129 @@ const MainFeature = () => {
             </motion.div>
           </motion.div>
         )}
+
+      {/* Version History Dialog */}
+      <AnimatePresence>
+        {showVersionHistory && selectedFileForHistory && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+            onClick={() => setShowVersionHistory(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white dark:bg-surface-800 rounded-2xl p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center mb-6">
+                <div className="w-12 h-12 bg-blue-100 dark:bg-blue-900/20 rounded-full flex items-center justify-center mr-4">
+                  <ApperIcon name="History" className="w-6 h-6 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-surface-900 dark:text-white">
+                    Version History
+                  </h3>
+                  <p className="text-sm text-surface-600 dark:text-surface-400 truncate">
+                    {selectedFileForHistory.name}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowVersionHistory(false)}
+                  className="p-2 text-surface-500 hover:text-surface-700 transition-colors"
+                >
+                  <ApperIcon name="X" className="w-5 h-5" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                {selectedFileForHistory.versions
+                  .sort((a, b) => b.versionNumber - a.versionNumber)
+                  .map((version) => (
+                  <div
+                    key={version.id}
+                    className={`p-4 rounded-xl border transition-all ${
+                      version.isCurrentVersion
+                        ? 'border-primary-300 bg-primary-50 dark:bg-primary-900/20'
+                        : 'border-surface-200 dark:border-surface-700 hover:bg-surface-50 dark:hover:bg-surface-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-4">
+                        <div className="flex-shrink-0">
+                          {version.thumbnail ? (
+                            <img
+                              src={version.thumbnail}
+                              alt={`Version ${version.versionNumber}`}
+                              className="w-12 h-12 object-cover rounded-lg"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 bg-surface-100 dark:bg-surface-700 rounded-lg flex items-center justify-center">
+                              <ApperIcon name={getFileIcon(selectedFileForHistory.type)} className="w-6 h-6 text-surface-500" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center space-x-2">
+                            <h4 className="text-sm font-medium text-surface-900 dark:text-white">
+                              Version {version.versionNumber}
+                            </h4>
+                            {version.isCurrentVersion && (
+                              <span className="px-2 py-1 text-xs bg-primary-500 text-white rounded-full">
+                                Current
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                            <div>{format(version.timestamp, 'MMM dd, yyyy \u2022 HH:mm')}</div>
+                            <div>{formatFileSize(version.size)}</div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center space-x-2">
+                        {!version.isCurrentVersion && (
+                          <motion.button
+                            onClick={() => revertToVersion(version.id)}
+                            className="px-3 py-1.5 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            Revert
+                          </motion.button>
+                        )}
+                        <button className="p-2 text-surface-400 hover:text-primary-500 transition-colors">
+                          <ApperIcon name="Download" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                    
+                    {version.isCurrentVersion && (
+                      <div className="mt-3 pt-3 border-t border-primary-200 dark:border-primary-800">
+                        <p className="text-xs text-primary-700 dark:text-primary-300">
+                          This is the current version of the file
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              <div className="mt-6 pt-4 border-t border-surface-200 dark:border-surface-700">
+                <div className="flex items-center justify-between text-sm text-surface-600 dark:text-surface-400">
+                  <span>Total versions: {selectedFileForHistory.versions.length}</span>
+                  <span>Current: v{selectedFileForHistory.currentVersion}</span>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       </AnimatePresence>
 
     </div>
