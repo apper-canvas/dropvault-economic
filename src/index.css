@@ -1,0 +1,91 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground font-sans;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .text-shadow {
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  }
+  
+  .backdrop-blur-xs {
+    backdrop-filter: blur(2px);
+  }
+}
+
+/* Custom file input styles */
+.file-input {
+  @apply opacity-0 absolute inset-0 w-full h-full cursor-pointer;
+}
+
+/* Upload progress animation */
+.upload-progress {
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 50%, #ec4899 100%);
+  background-size: 200% 100%;
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Drag and drop styles */
+.drag-active {
+  @apply border-primary-500 bg-primary-50 dark:bg-primary-900/20;
+}
+
+.drag-reject {
+  @apply border-red-500 bg-red-50 dark:bg-red-900/20;
+}
+
+/* File type specific colors */
+.file-pdf { @apply bg-red-100 text-red-700 border-red-200; }
+.file-doc { @apply bg-blue-100 text-blue-700 border-blue-200; }
+.file-img { @apply bg-green-100 text-green-700 border-green-200; }
+.file-video { @apply bg-purple-100 text-purple-700 border-purple-200; }
+.file-audio { @apply bg-yellow-100 text-yellow-700 border-yellow-200; }
+.file-archive { @apply bg-gray-100 text-gray-700 border-gray-200; }
+.file-default { @apply bg-surface-100 text-surface-700 border-surface-200; }
+
+/* Responsive design base */
+@media (max-width: 640px) {
+  .container {
+    @apply px-4;
+  }
+}
+
+@media (min-width: 768px) {
+  .container {
+    @apply px-6;
+  }
+}
+
+@media (min-width: 1024px) {
+  .container {
+    @apply px-8;
+  }
+}
